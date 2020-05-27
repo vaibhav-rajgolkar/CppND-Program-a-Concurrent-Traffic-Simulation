@@ -19,7 +19,8 @@ template <class T>
 class MessageQueue
 {
 public:
-
+    T receive();
+    void send(T &&msg);
 private:
     
 };
@@ -36,10 +37,9 @@ public:
     // constructor / desctructor
     TrafficLight();
 
-    enum TrafficLightPhase
+    enum class TrafficLightPhase
     {
         _phaseRed,
-        _phaseYellow,
         _phaseGreen
     };
 
@@ -56,7 +56,7 @@ private:
     void cycleThroughPhases();
 
 
-
+    MessageQueue<TrafficLightPhase> _queue;
     TrafficLightPhase _currentPhase;
 
     // FP.4b : create a private member of type MessageQueue for messages of type TrafficLightPhase 
