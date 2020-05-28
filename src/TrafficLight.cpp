@@ -27,6 +27,7 @@ void MessageQueue<T>::send(T &&message)
     // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
     std::lock_guard<std::mutex> lock(_mutex);
     _queue.push_back(std::move(message));
+    std::cout<<"\nFor thread : "<<std::this_thread::get_id()<<" : size "<<_queue.size();
     _condition.notify_one();
 }
 
@@ -47,6 +48,7 @@ void TrafficLight::waitForGreen()
     while(true)
     {
        TrafficLightPhase message = _queue.receive();
+
        if(message == TrafficLightPhase::_phaseGreen)
         {
             return;
@@ -71,32 +73,35 @@ void TrafficLight::cycleThroughPhases()
     // FP.2a : Implement the function with an infinite loop that measures the time between two loop cycles 
     // and toggles the current phase of the traffic light between red and green and sends an update method 
     // to the message queue using move semantics. The cycle duration should be a random value between 4 and 6 seconds. 
-    // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles. 
-    
+    // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles.
+
     std::chrono::time_point<std::chrono::system_clock> previousTimer;
 
     // init stop watch
     previousTimer = std::chrono::system_clock::now();
     while(true)
     {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         double timeDifference = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - previousTimer).count();
+
         // move toggled current phase to message queue
         if(timeDifference >= 4 && timeDifference <= 6)
         {
             if(_currentPhase == TrafficLightPhase::_phaseRed)
             {
-                _currentPhase == TrafficLightPhase::_phaseGreen;
+                _currentPhase = TrafficLightPhase::_phaseGreen;
             }
             else
             {
-                _currentPhase == TrafficLightPhase::_phaseRed;
+                _currentPhase = TrafficLightPhase::_phaseRed;
             }
+
             _queue.send(std::move(_currentPhase));
+
+            // reset stop watch
+            previousTimer = std::chrono::system_clock::now();
         }
-        // reset stop watch
-        previousTimer = std::chrono::system_clock::now();
     }
 }
 
