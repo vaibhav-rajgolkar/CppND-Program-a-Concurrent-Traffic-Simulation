@@ -4,15 +4,12 @@
 
 /* Implementation of class "MessageQueue" */
 
- 
 template <typename T>
 T MessageQueue<T>::receive()
 {
-    // FP.5a : The method receive should use std::unique_lock<std::mutex> and _condition.wait() 
-    // to wait for and receive new messages and pull them from the queue using move semantics. 
-    // The received object should then be returned by the receive function. 
     std::unique_lock<std::mutex> uLock(_mutex);
-    _condition.wait(uLock, [&, this](){ return !_queue.empty(); });
+    // wait till data becomes available in message queue
+    _condition.wait(uLock, [&, this]() { return !_queue.empty(); });
 
     T message = _queue.back();
     _queue.pop_back();
@@ -23,35 +20,28 @@ T MessageQueue<T>::receive()
 template <typename T>
 void MessageQueue<T>::send(T &&message)
 {
-    // FP.4a : The method send should use the mechanisms std::lock_guard<std::mutex> 
-    // as well as _condition.notify_one() to add a new message to the queue and afterwards send a notification.
     std::lock_guard<std::mutex> lock(_mutex);
+
     _queue.push_back(std::move(message));
     _condition.notify_one();
 }
 
-
 /* Implementation of class "TrafficLight" */
 
-
 TrafficLight::TrafficLight()
-: _currentPhase(TrafficLightPhase::_phaseRed)
+    : _currentPhase(TrafficLightPhase::_phaseRed)
 {
 }
 
 void TrafficLight::waitForGreen()
 {
-    // FP.5b : add the implementation of the method waitForGreen, in which an infinite while-loop 
-    // runs and repeatedly calls the receive function on the message queue. 
-    // Once it receives TrafficLightPhase::green, the method returns.
-    std::lock_guard<std::mutex> lock(_mutex);
-    while(true)
+    while (true)
     {
-       TrafficLightPhase message = _queue.receive();
+        TrafficLightPhase message = _queue.receive();
 
-       if(message == TrafficLightPhase::_phaseGreen)
+        if (message == TrafficLightPhase::_phaseGreen)
         {
-            _currentPhase = message;
+            setCurrentPhase(message);
             return;
         }
     }
@@ -60,56 +50,58 @@ void TrafficLight::waitForGreen()
 TrafficLight::TrafficLightPhase TrafficLight::getCurrentPhase()
 {
     std::lock_guard<std::mutex> lock(_mutex);
+
     return _currentPhase;
+}
+
+void TrafficLight::setCurrentPhase(TrafficLight::TrafficLightPhase newPhase)
+{
+    std::lock_guard<std::mutex> lock(_mutex);
+
+    _currentPhase = newPhase;
 }
 
 void TrafficLight::simulate()
 {
-    // FP.2b : Finally, the private method „cycleThroughPhases“ should be started in a thread when the public method „simulate“ is called. To do this, use the thread queue in the base class. 
     threads.emplace_back(std::thread(&TrafficLight::cycleThroughPhases, this));
 }
 
 // virtual function which is executed in a thread
 void TrafficLight::cycleThroughPhases()
 {
-    // FP.2a : Implement the function with an infinite loop that measures the time between two loop cycles 
-    // and toggles the current phase of the traffic light between red and green and sends an update method 
-    // to the message queue using move semantics. The cycle duration should be a random value between 4 and 6 seconds. 
-    // Also, the while-loop should use std::this_thread::sleep_for to wait 1ms between two cycles.
-
-    std::random_device rd;
-    std::mt19937 eng(rd());
+    // random number generator for random cycle durations between 4 to 6
+    std::random_device randomDevice;
+    std::mt19937 mersenneTwisterEngine(randomDevice());
     std::uniform_int_distribution<int> distribution(4, 6);
-    int cycleDuration = distribution(eng);
+    int cycleDuration = distribution(mersenneTwisterEngine);
 
     std::chrono::time_point<std::chrono::system_clock> previousTimer;
 
     // init stop watch
     previousTimer = std::chrono::system_clock::now();
-    while(true)
+    while (true)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         int timeDifference = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - previousTimer).count();
-        
+
         // move toggled current phase to message queue
-        if(timeDifference >= cycleDuration)
+        if (timeDifference == cycleDuration)
         {
-            if(_currentPhase == TrafficLightPhase::_phaseRed)
+            if (getCurrentPhase() == TrafficLightPhase::_phaseRed)
             {
-                _currentPhase = TrafficLightPhase::_phaseGreen;
+                setCurrentPhase(TrafficLightPhase::_phaseGreen);
             }
             else
             {
-                _currentPhase = TrafficLightPhase::_phaseRed;
+                setCurrentPhase(TrafficLightPhase::_phaseRed);
             }
 
             _queue.send(std::move(_currentPhase));
 
             // reset stop watch
             previousTimer = std::chrono::system_clock::now();
-            cycleDuration = distribution(eng);
+            cycleDuration = distribution(mersenneTwisterEngine);
         }
     }
 }
-
