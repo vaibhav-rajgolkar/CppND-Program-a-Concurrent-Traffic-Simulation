@@ -57,7 +57,6 @@ private:
 
     void cycleThroughPhases();
 
-
     MessageQueue<TrafficLightPhase> _queue;
     TrafficLightPhase _currentPhase;
 
